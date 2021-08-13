@@ -1,2 +1,3 @@
 # mlmodels
-Machine learning models from scratch
+
+Deep learning models in PyTorch.
