@@ -1,8 +1,10 @@
 """
 Normalizing flow implemenation based on Glow (Kingma et al. 2018)
+
 Thomas Mortier
 2021
 """
+
 import torch
 import math
 

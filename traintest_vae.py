@@ -1,5 +1,5 @@
 """
-Code for training and testing of NF model.
+Code for training and testing of VAE model.
 
 Thomas Mortier
 2021
@@ -26,12 +26,12 @@ def tensor_to_img(X, figname=""):
 
 # delete old png files 
 for file in os.listdir('.'):
-    if file.endswith('.png') and '_nf_' in file:
+    if file.endswith('.png') and '_vae_' in file:
         os.remove(file)
 
 # cuda init
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if use_cuda else "cpu")
+device = torch.device("cuda:1" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
 
 # params
@@ -39,13 +39,8 @@ params = {'batch_size': 16,
           'shuffle': True,
           'num_workers': 2}
 learn_rate = 0.0001
-max_epochs = 1000
+max_epochs = 200
 img_size = (64,64)
-FS=256
-K=32
-L=4
-complexmodel = False
-sampling_temperature = 0.9
 
 # data
 t = transforms.Compose([transforms.ToTensor()])
@@ -53,10 +48,7 @@ data = AnimalDataset("/home/data/tfmortier/Github/mlmodels/data/Animals", img_si
 training_dataloader = torch.utils.data.DataLoader(data, **params)
 
 # model
-if complexmodel:
-    model = Glow(FS,K,L,input_dims=(3,*img_size),gaussianize=True,OBO=True)
-else:
-    model = NF(K,L,12,FS,device)
+model = ...
 
 print("Number of total parameters for model = {0}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 if use_cuda:
@@ -71,10 +63,7 @@ for epoch in range(max_epochs):
         # gpu transfer
         X = X.to(device)
 
-        if complexmodel:
-            loss = - model.log_prob(X, bits_per_pixel=True).mean(0)
-        else:
-            loss = model(X).mean(0)
+        loss = ...
 
         optimizer.zero_grad()
         loss.backward()
@@ -83,11 +72,5 @@ for epoch in range(max_epochs):
         train_loss += loss.item()
 
     print("Epoch {0} loss = {1}".format(epoch+1, train_loss/len(training_dataloader)))
-
-    if complexmodel:
-        Xhat = model.inverse(batch_size=32)[0]
-    else:
-        random_sample = torch.randn(params["batch_size"],12*(2**(L-1)),img_size[0]//(2**L),img_size[0]//(2**L))*sampling_temperature
-        Xhat, _ = model.sample(random_sample.to(device))
-    
-    tensor_to_img(Xhat, 'sample_nf_{0}'.format(epoch))
+    Xhat, _ = model.sample(torch.randn(params["batch_size"],12*(2**(L-1)),img_size[0]//(2**L),img_size[0]//(2**L)).to(device))
+    tensor_to_img(Xhat, 'sample_vae_{0}'.format(epoch))
