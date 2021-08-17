@@ -14,7 +14,7 @@ import torch.nn.functional as F
 class VAE(nn.Module):
     """ represents the main vae class.
     """
-    def __init__(self, c_in, hidden_dim, latent_dim, gamma, device):
+    def __init__(self, c_in, hidden_dim, latent_dim, gamma, isotropic, device):
         super(VAE, self).__init__()
         # store information
         self.c_in = c_in 
@@ -22,6 +22,7 @@ class VAE(nn.Module):
         self.latent_dim = latent_dim
         self.device = device
         self.gamma = gamma # controls the influence of the reconstruction loss
+        self.isotropic = isotropic # defines whether the latent space is an isotropic Guassian or full-covariance
         
         # register encoder
         self.encoder = []
@@ -37,9 +38,10 @@ class VAE(nn.Module):
         # register variational parameters for recognition model/encoder  
         self.mu_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim)
         self.logsigma_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim)
-        self.Lt_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim*self.latent_dim)
-        # register mask 
-        self.register_buffer('Lm',torch.tril(torch.ones(self.latent_dim,self.latent_dim),diagonal=-1))
+        if not self.isotropic:
+            self.Lt_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim*self.latent_dim)
+            # register mask 
+            self.register_buffer('Lm',torch.tril(torch.ones(self.latent_dim,self.latent_dim),diagonal=-1))
 
         # register decoder
         self.decoder_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*4)
@@ -60,13 +62,18 @@ class VAE(nn.Module):
         # encode
         h = self.encoder(x)
         h = h.view(h.shape[0],-1)
-        mu, logsigma, Lt = self.mu_f(h), self.logsigma_f(h), self.Lt_f(h)
-        Lt = Lt.view(h.shape[0],self.Lm.shape[0], self.Lm.shape[1])
-        # calculate L
-        L = self.Lm*Lt+torch.diag_embed(logsigma.exp(), offset=0, dim1=-2, dim2=-1)
-        # calcalate L @ e
-        Le = torch.einsum('bij,bi->bi',L, e)
-        z = Le + mu
+        mu, logsigma = self.mu_f(h), self.logsigma_f(h)
+        if not self.isotropic:
+            Lt = self.Lt_f(h)
+            Lt = Lt.view(h.shape[0],self.Lm.shape[0], self.Lm.shape[1])
+            # calculate L
+            L = self.Lm*Lt+torch.diag_embed(logsigma.exp(), offset=0, dim1=-2, dim2=-1)
+            # calcalate L @ e
+            Le = torch.einsum('bij,bi->bi',L, e)
+            z = Le + mu
+        else:
+            z = (logsigma.exp()*e)+mu
+
         # prior to decoding make sure that our hidden representation is extended to correct format for last convolutional layer in encoder
         z = self.decoder_pp(z)
         z = z.view(z.shape[0],self.hidden_dim[-1],2,2)

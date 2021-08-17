@@ -43,8 +43,9 @@ max_epochs = 200
 img_size = (64,64)
 c_in = 3
 hidden_dim = [32, 64, 128, 256, 512]
-latent_dim = 256
+latent_dim = 1024
 gamma = 0.99
+isotropic = True
 
 # data
 t = transforms.Compose([transforms.ToTensor()])
@@ -52,7 +53,7 @@ data = AnimalDataset("/home/data/tfmortier/Github/mlmodels/data/Animals", img_si
 training_dataloader = torch.utils.data.DataLoader(data, **params)
 
 # model
-model = VAE(c_in, hidden_dim, latent_dim, gamma, device)
+model = VAE(c_in, hidden_dim, latent_dim, gamma, isotropic, device)
 
 print("Number of total parameters for model = {0}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 if use_cuda:
