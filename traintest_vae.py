@@ -44,7 +44,7 @@ img_size = (64,64)
 c_in = 3
 hidden_dim = [32, 64, 128, 256, 512]
 latent_dim = 256
-debug = False
+gamma = 0.99
 
 # data
 t = transforms.Compose([transforms.ToTensor()])
@@ -52,7 +52,7 @@ data = AnimalDataset("/home/data/tfmortier/Github/mlmodels/data/Animals", img_si
 training_dataloader = torch.utils.data.DataLoader(data, **params)
 
 # model
-model = VAE(c_in, hidden_dim, latent_dim, device, debug)
+model = VAE(c_in, hidden_dim, latent_dim, gamma, device)
 
 print("Number of total parameters for model = {0}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 if use_cuda:
@@ -70,11 +70,9 @@ for epoch in range(max_epochs):
         X = X.to(device)
         # calculate forward pass with loss
         loss, p = model(X, E)
-        #loss = loss.mean(0)
         # update
         optimizer.zero_grad()
         loss.backward()
-        #nn.utils.clip_grad_norm_(model.parameters(), 50)
         optimizer.step()
         train_loss += loss.item()
 

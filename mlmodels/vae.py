@@ -14,14 +14,14 @@ import torch.nn.functional as F
 class VAE(nn.Module):
     """ represents the main vae class.
     """
-    def __init__(self, c_in, hidden_dim, latent_dim, device, debug=False):
+    def __init__(self, c_in, hidden_dim, latent_dim, gamma, device):
         super(VAE, self).__init__()
         # store information
         self.c_in = c_in 
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         self.device = device
-        self.debug = debug
+        self.gamma = gamma # controls the influence of the reconstruction loss
         
         # register encoder
         self.encoder = []
@@ -57,14 +57,6 @@ class VAE(nn.Module):
         self.decoder = nn.Sequential(*self.decoder)
 
     def forward(self, x, e):
-        if self.debug:
-            with torch.no_grad():
-                print("MODEL INFORMATION")
-                inp = x
-                print("Input shape: {0}".format(inp.shape))
-                for mod in self.encoder:
-                    inp = mod(inp)
-                    print("{0} shape: {1}".format(mod, inp.shape))
         # encode
         h = self.encoder(x)
         h = h.view(h.shape[0],-1)
@@ -79,26 +71,12 @@ class VAE(nn.Module):
         z = self.decoder_pp(z)
         z = z.view(z.shape[0],self.hidden_dim[-1],2,2)
         
-        if self.debug:
-            with torch.no_autograd():
-                inp = z
-                print("Latent shape: {0}".format(inp.shape))
-                for mod in self.decoder:
-                    inp = mod(inp)
-                    print("{0} shape: {1}".format(mod, inp.shape))
-
-        # decode
+        # decode and calculate loss
         p = self.decoder(z)
         kl_loss = (-0.5*(1+logsigma-mu**2-torch.exp(logsigma)).sum(dim=1)).mean(dim=0)
         recon_loss_criterion = nn.MSELoss()
         recon_loss = recon_loss_criterion(p,x)
-        loss = recon_loss*0.99+kl_loss
-
-        # get losses
-        #loss_logqz = -torch.sum((1/2)*(e**2+torch.log(2*torch.tensor(math.pi))+logsigma),dim=1)
-        #loss_logpz = -torch.sum((1/2)*(z**2+torch.log(2*torch.tensor(math.pi))),dim=[1,2,3])
-        #loss_logpx = F.mse_loss(p,x,reduction='none').sum(dim=[1,2,3])/(x.shape[1]*x.shape[2]*x.shape[3])
-        #loss = loss_logpx-loss_logpz+loss_logqz
+        loss = recon_loss*self.gamma+kl_loss
 
         return loss, p
 
