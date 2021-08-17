@@ -16,7 +16,6 @@ from torch import nn
 from mlmodels.data import AnimalDataset
 from torchvision import datasets, transforms
 from mlmodels.nf import NF
-from mlmodels.nfnew import Glow
 
 def tensor_to_img(X, figname=""):
     X = X.permute([0,2,3,1]).cpu().detach().numpy()

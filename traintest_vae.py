@@ -15,8 +15,8 @@ import numpy as np
 from torch import nn
 from mlmodels.data import AnimalDataset
 from torchvision import datasets, transforms
-from mlmodels.nf import NF
-from mlmodels.nfnew import Glow
+from mlmodels.vae import VAE
+from torchsummary import summary
 
 def tensor_to_img(X, figname=""):
     X = X.permute([0,2,3,1]).cpu().detach().numpy()
@@ -31,7 +31,7 @@ for file in os.listdir('.'):
 
 # cuda init
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:1" if use_cuda else "cpu")
+device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
 
 # params
@@ -41,6 +41,10 @@ params = {'batch_size': 16,
 learn_rate = 0.0001
 max_epochs = 200
 img_size = (64,64)
+c_in = 3
+hidden_dim = [32, 64, 128, 256, 512]
+latent_dim = 256
+debug = False
 
 # data
 t = transforms.Compose([transforms.ToTensor()])
@@ -48,7 +52,7 @@ data = AnimalDataset("/home/data/tfmortier/Github/mlmodels/data/Animals", img_si
 training_dataloader = torch.utils.data.DataLoader(data, **params)
 
 # model
-model = ...
+model = VAE(c_in, hidden_dim, latent_dim, device, debug)
 
 print("Number of total parameters for model = {0}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 if use_cuda:
@@ -60,17 +64,22 @@ for epoch in range(max_epochs):
     # Training
     train_loss = 0
     for X, _ in training_dataloader:
+        # also draw noise samples from N(0,1)
+        E = torch.randn(X.shape[0],latent_dim).to(device)
         # gpu transfer
         X = X.to(device)
-
-        loss = ...
-
+        # calculate forward pass with loss
+        loss, p = model(X, E)
+        #loss = loss.mean(0)
+        # update
         optimizer.zero_grad()
         loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), 50)
+        #nn.utils.clip_grad_norm_(model.parameters(), 50)
         optimizer.step()
         train_loss += loss.item()
 
     print("Epoch {0} loss = {1}".format(epoch+1, train_loss/len(training_dataloader)))
-    Xhat, _ = model.sample(torch.randn(params["batch_size"],12*(2**(L-1)),img_size[0]//(2**L),img_size[0]//(2**L)).to(device))
+    tensor_to_img(p, 'reconstruction_vae_{0}'.format(epoch))
+    tensor_to_img(X, 'original_vae_{0}'.format(epoch))
+    Xhat = model.sample(torch.randn(params["batch_size"],latent_dim).to(device))
     tensor_to_img(Xhat, 'sample_vae_{0}'.format(epoch))
