@@ -12,15 +12,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class VAE(nn.Module):
-    """ represents the main vae class.
+    """ Represents the main vae class.
     """
-    def __init__(self, c_in, hidden_dim, latent_dim, gamma, isotropic, device):
+    def __init__(self, c_in, hidden_dim, latent_dim, gamma, isotropic):
         super(VAE, self).__init__()
         # store information
         self.c_in = c_in 
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
-        self.device = device
         self.gamma = gamma # controls the influence of the reconstruction loss
         self.isotropic = isotropic # defines whether the latent space is an isotropic Guassian or full-covariance
         
@@ -36,15 +35,15 @@ class VAE(nn.Module):
             input_channels = d
         self.encoder = nn.Sequential(*self.encoder)
         # register variational parameters for recognition model/encoder  
-        self.mu_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim)
-        self.logsigma_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim)
+        self.mu_f = nn.Linear(self.hidden_dim[-1]*64, self.latent_dim)
+        self.logsigma_f = nn.Linear(self.hidden_dim[-1]*64, self.latent_dim)
         if not self.isotropic:
-            self.Lt_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim*self.latent_dim)
+            self.Lt_f = nn.Linear(self.hidden_dim[-1]*64, self.latent_dim*self.latent_dim)
             # register mask 
             self.register_buffer('Lm',torch.tril(torch.ones(self.latent_dim,self.latent_dim),diagonal=-1))
 
         # register decoder
-        self.decoder_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*16)
+        self.decoder_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*64)
         self.decoder = []
         for i in range(1,len(self.hidden_dim)):
             self.decoder.append(nn.Sequential(
@@ -76,7 +75,7 @@ class VAE(nn.Module):
 
         # prior to decoding make sure that our hidden representation is extended to correct format for last convolutional layer in encoder
         z = self.decoder_pp(z)
-        z = z.view(z.shape[0],self.hidden_dim[-1],4,4)
+        z = z.view(z.shape[0],self.hidden_dim[-1],8,8)
         
         # decode and calculate loss
         p = self.decoder(z)
@@ -91,6 +90,6 @@ class VAE(nn.Module):
         # decode 
         with torch.no_grad():
             p = self.decoder_pp(e)
-            p = p.view(p.shape[0],self.hidden_dim[-1],4,4)
+            p = p.view(p.shape[0],self.hidden_dim[-1],8,8)
             p = self.decoder(p)
         return p
