@@ -38,13 +38,13 @@ torch.backends.cudnn.benchmark = True
 params = {'batch_size': 16,
           'shuffle': True,
           'num_workers': 2}
-learn_rate = 0.0001
-max_epochs = 200
+learn_rate = 0.001
+max_epochs = 1000
 img_size = (64,64)
 c_in = 3
-hidden_dim = [32, 64, 128, 256, 512]
-latent_dim = 1024
-gamma = 0.99
+hidden_dim = [32, 64, 128, 256]
+latent_dim = 5012
+gamma = 0.95
 isotropic = True
 
 # data
@@ -79,6 +79,5 @@ for epoch in range(max_epochs):
 
     print("Epoch {0} loss = {1}".format(epoch+1, train_loss/len(training_dataloader)))
     tensor_to_img(p, 'reconstruction_vae_{0}'.format(epoch))
-    tensor_to_img(X, 'original_vae_{0}'.format(epoch))
     Xhat = model.sample(torch.randn(params["batch_size"],latent_dim).to(device))
     tensor_to_img(Xhat, 'sample_vae_{0}'.format(epoch))

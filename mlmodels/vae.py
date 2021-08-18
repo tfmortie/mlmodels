@@ -36,15 +36,15 @@ class VAE(nn.Module):
             input_channels = d
         self.encoder = nn.Sequential(*self.encoder)
         # register variational parameters for recognition model/encoder  
-        self.mu_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim)
-        self.logsigma_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim)
+        self.mu_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim)
+        self.logsigma_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim)
         if not self.isotropic:
-            self.Lt_f = nn.Linear(self.hidden_dim[-1]*4, self.latent_dim*self.latent_dim)
+            self.Lt_f = nn.Linear(self.hidden_dim[-1]*16, self.latent_dim*self.latent_dim)
             # register mask 
             self.register_buffer('Lm',torch.tril(torch.ones(self.latent_dim,self.latent_dim),diagonal=-1))
 
         # register decoder
-        self.decoder_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*4)
+        self.decoder_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*16)
         self.decoder = []
         for i in range(1,len(self.hidden_dim)):
             self.decoder.append(nn.Sequential(
@@ -76,14 +76,14 @@ class VAE(nn.Module):
 
         # prior to decoding make sure that our hidden representation is extended to correct format for last convolutional layer in encoder
         z = self.decoder_pp(z)
-        z = z.view(z.shape[0],self.hidden_dim[-1],2,2)
+        z = z.view(z.shape[0],self.hidden_dim[-1],4,4)
         
         # decode and calculate loss
         p = self.decoder(z)
-        kl_loss = (-0.5*(1+logsigma-mu**2-torch.exp(logsigma)).sum(dim=1)).mean(dim=0)
+        kl_loss = (-0.5*(1+logsigma-mu**2-torch.exp(logsigma)).sum(dim=1)).mean(dim=0)/(self.hidden_dim[-1]*4*4)
         recon_loss_criterion = nn.MSELoss()
         recon_loss = recon_loss_criterion(p,x)
-        loss = recon_loss*self.gamma+kl_loss
+        loss = recon_loss+kl_loss*self.gamma
 
         return loss, p
 
@@ -91,6 +91,6 @@ class VAE(nn.Module):
         # decode 
         with torch.no_grad():
             p = self.decoder_pp(e)
-            p = p.view(p.shape[0],self.hidden_dim[-1],2,2)
+            p = p.view(p.shape[0],self.hidden_dim[-1],4,4)
             p = self.decoder(p)
         return p
