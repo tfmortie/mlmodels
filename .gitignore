@@ -130,3 +130,9 @@ dmypy.json
 
 # Data
 data/
+
+# Test script
+mlmodels/test.py
+
+# Images
+*.png
