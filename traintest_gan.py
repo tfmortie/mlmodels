@@ -38,14 +38,12 @@ torch.backends.cudnn.benchmark = True
 params = {'batch_size': 16,
           'shuffle': True,
           'num_workers': 2}
-learn_rate = 0.001
+learn_rate = 0.00001
 max_epochs = 1000
 img_size = (64,64)
 c_in = 3
 hidden_dim = [32, 64, 128]
 latent_dim = 5012
-gamma = 0.01
-isotropic = True
 
 # data
 t = transforms.Compose([transforms.ToTensor()])
@@ -54,7 +52,7 @@ training_dataloader = torch.utils.data.DataLoader(data, **params)
 
 # models
 generator = GANG(c_in, hidden_dim, latent_dim)
-discriminator = GANG(c_in, hidden_dim)
+discriminator = GAND(c_in, hidden_dim)
 print("Number of total parameters for generator = {0}".format(sum(p.numel() for p in generator.parameters() if p.requires_grad)))
 print("Number of total parameters for discriminator = {0}".format(sum(p.numel() for p in discriminator.parameters() if p.requires_grad)))
 if use_cuda:
@@ -72,19 +70,22 @@ for epoch in range(max_epochs):
     generator_loss = 0
     discriminator_loss = 0
     for X, _ in training_dataloader:
+        # we need to maximize log(D(x)) + log(1 - D(G(z)))
         # first train the discriminator
         optimizer_d.zero_grad()        
-        # 1.1) D on real images
-        labels = torch.full((X.size(0),), 1).to(device)
-        output = discriminator(labels)
-        loss_D_r = criterion(output, labels)
+        discriminator.zero_grad()
+        # 1.1) D on real images 
+        labels = torch.full((X.size(0),), 1, dtype=torch.float).to(device)
+        output = discriminator(X.to(device))
+        loss_D_r = criterion(output.view(-1), labels) 
         loss_D_r.backward()
         optimizer_d.step()
         # 1.2) D on fake images
-        labels = torch.fill_(0)
-        X_fake = torch.randn(X.size(0), latent_dim).to(device)
-        output = discriminator(X_fake)
-        loss_D_f = criterion(output, labels)
+        labels = labels.fill_(0)
+        Z = torch.randn(X.size(0),latent_dim).to(device)
+        Xhat = generator(Z)
+        output = discriminator(Xhat)
+        loss_D_f = criterion(output.view(-1), labels) 
         loss_D_f.backward() # important: gradients are accumulated (summed) with previous gradients
         loss_D = loss_D_r + loss_D_f
         discriminator_loss += loss_D.item()
@@ -92,12 +93,17 @@ for epoch in range(max_epochs):
 
         # secondly train the generator
         optimizer_g.zero_grad()
-        labels = torch.fill_(1)
-        loss_G = criterion(output, labels)
+        generator.zero_grad()
+        labels = labels.fill_(1)
+        Z = torch.randn(X.size(0),latent_dim).to(device)
+        Xhat = generator(Z)
+        output = discriminator(Xhat)
+        loss_G = criterion(output.view(-1), labels)
         loss_G.backward()
         generator_loss += loss_G.item()
         optimizer_g.step()
 
-    print("Epoch {0} generator loss = {1}        discriminator loss = {2}".format(epoch+1, generator_loss/len(training_dataloader), discriminator_loss/(len(training_dataloader)*2))
-    Xhat = model.sample(torch.randn(params["batch_size"],latent_dim).to(device))
+    print("Epoch {0} generator loss = {1}        discriminator loss = {2}".format(epoch+1, generator_loss, discriminator_loss))
+    with torch.no_grad():
+        Xhat = generator(torch.randn(params["batch_size"],latent_dim).to(device))
     tensor_to_img(Xhat, 'sample_gan_{0}'.format(epoch))

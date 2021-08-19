@@ -16,7 +16,7 @@ class GANG(nn.Module):
     """ Represents the GAN generator class.
     """
     def __init__(self, c_in, hidden_dim, latent_dim):
-        super(GAN, self).__init__()
+        super(GANG, self).__init__()
         self.c_in = c_in
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
@@ -38,21 +38,15 @@ class GANG(nn.Module):
 
     def forward(self, e):
         p = self.generator_pp(e)
+        p = p.view(e.size(0),self.hidden_dim[-1],8,8)
         p = self.generator(p)
         return p
-
-    def sample(self, e):
-        with torch.no_grad():
-            p = self.generator_pp(e)
-            p = self.generator(p)
-            return p
-
 
 class GAND(nn.Module):
     """ Represents the GAN discriminator class.
     """
     def __init__(self, c_in, hidden_dim):
-        super(GAN, self).__init__()
+        super(GAND, self).__init__()
         self.c_in = c_in
         self.hidden_dim = hidden_dim
         
@@ -66,12 +60,15 @@ class GAND(nn.Module):
                 nn.LeakyReLU(),
             ))
             input_channels = d
-        self.discriminator.append(nn.Sequential(
+        self.discriminator_pp = nn.Sequential(
             nn.Linear(self.hidden_dim[-1]*64, 1),
             nn.Sigmoid()
-            ))
+        )
         self.discriminator = nn.Sequential(*self.discriminator)
 
     def forward(self, x):
-        return self.discriminator(x)
+        p = self.discriminator(x)
+        p = p.view(x.size(0),-1)
+        p = self.discriminator_pp(p)
 
+        return p
