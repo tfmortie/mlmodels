@@ -22,7 +22,7 @@ class GANG(nn.Module):
         self.latent_dim = latent_dim
         
         # register generator
-        self.generator_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*64)
+        self.generator_pp = nn.Linear(latent_dim, self.hidden_dim[-1]*16)
         self.generator = []
         for i in range(1,len(self.hidden_dim)):
             self.generator.append(nn.Sequential(
@@ -38,7 +38,7 @@ class GANG(nn.Module):
 
     def forward(self, e):
         p = self.generator_pp(e)
-        p = p.view(e.size(0),self.hidden_dim[-1],8,8)
+        p = p.view(e.size(0),self.hidden_dim[-1],4,4)
         p = self.generator(p)
         return p
 
@@ -61,7 +61,9 @@ class GAND(nn.Module):
             ))
             input_channels = d
         self.discriminator_pp = nn.Sequential(
-            nn.Linear(self.hidden_dim[-1]*64, 1),
+            nn.Linear(self.hidden_dim[-1]*16, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, 1),
             nn.Sigmoid()
         )
         self.discriminator = nn.Sequential(*self.discriminator)

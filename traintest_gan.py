@@ -35,14 +35,14 @@ device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.backends.cudnn.benchmark = True
 
 # params
-params = {'batch_size': 16,
+params = {'batch_size': 32,
           'shuffle': True,
           'num_workers': 2}
-learn_rate = 0.00001
+learn_rate = 0.0001
 max_epochs = 1000
 img_size = (64,64)
 c_in = 3
-hidden_dim = [32, 64, 128]
+hidden_dim = [32, 64, 128, 256]
 latent_dim = 5012
 
 # data
@@ -103,7 +103,7 @@ for epoch in range(max_epochs):
         generator_loss += loss_G.item()
         optimizer_g.step()
 
-    print("Epoch {0} generator loss = {1}        discriminator loss = {2}".format(epoch+1, generator_loss, discriminator_loss))
+    print("Epoch {0} generator loss = {1}        discriminator loss = {2}".format(epoch+1, generator_loss/len(training_dataloader), discriminator_loss/len(training_dataloader)))
     with torch.no_grad():
         Xhat = generator(torch.randn(params["batch_size"],latent_dim).to(device))
     tensor_to_img(Xhat, 'sample_gan_{0}'.format(epoch))
