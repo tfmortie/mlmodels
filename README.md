@@ -1,3 +1,3 @@
 # mlmodels
 
-Deep learning models in PyTorch.
+Various machine learning models implemented in PyTorch.
