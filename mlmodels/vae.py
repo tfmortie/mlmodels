@@ -4,7 +4,6 @@ Variational autoencoder implementation (Kingma et al. 2013)
 Thomas Mortier
 2021
 """
-
 import torch
 import math
 

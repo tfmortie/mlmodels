@@ -4,7 +4,6 @@ Code for training and testing of VAE model.
 Thomas Mortier
 2021
 """
-
 import torch
 import os
 import torch.nn as nn

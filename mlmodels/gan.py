@@ -4,7 +4,6 @@ Generative adversarial networks (Goodfellow et al. 2014)
 Thomas Mortier
 2021
 """
-
 import torch
 import math
 
