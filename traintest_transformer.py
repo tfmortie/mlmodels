@@ -6,6 +6,7 @@ March 2022
 """
 import argparse
 import torch
+import time
 import io
 import os
 import pickle
@@ -114,9 +115,9 @@ def traintransformer(args):
     model = model.to(args.device)
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'{pytorch_total_params=}')
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9,0.98), eps=1e-08)
     criterion = nn.CrossEntropyLoss(ignore_index=vocab_t["<pad>"])
-    cntr = 0
+    cntr, start_time = 0, time.time()
     for e in range(args.e):
         dl = data_loader(vocab_s, vocab_t, args)
         train_loss = 0.0
@@ -133,8 +134,11 @@ def traintransformer(args):
             # backprop
             optimizer.step()
             if i % args.i == args.i-1:
-                print("Epoch {0} training loss = {1}".format(e,train_loss/args.i))
+                stop_time = time.time()
+                processed_time = stop_time-start_time
+                print("Epoch {0} training loss = {1} in {2}s".format(e,train_loss/args.i,processed_time))
                 train_loss = 0
+                start_time = time.time()
                 cntr+=1
             if cntr == args.it:
                 break
@@ -198,8 +202,8 @@ if __name__=="__main__":
     parser.add_argument("-m",dest="m",type=bool,default=True,help="Indicates whether we want training (True) or solely inference (False) mode.")
     parser.add_argument("-e",dest="e",type=int,default=100,help="Number of epochs.")
     parser.add_argument("-i",dest="i",type=int,default=100,help="Number of iterations to print training loss")
-    parser.add_argument("-it",dest="it",type=int,default=20,help="Number of evaluations after which the model should stop training.")
-    parser.add_argument("-b",dest="b",type=int,default=8,help="Batch size.")
+    parser.add_argument("-it",dest="it",type=int,default=100,help="Number of evaluations after which the model should stop training.")
+    parser.add_argument("-b",dest="b",type=int,default=32,help="Batch size.")
     parser.add_argument("-ml",dest="ml",type=int,default=5000,help="Max. length of target and source sequences.")
     parser.add_argument("-dev",dest="dev",type=int,default=-1,help="Device for model training and inference (-2:CPU, -1:default GPU, >=0:GPUx).")
     parser.add_argument("-mo",dest="mo",type=str,default="./tmodel.pt",help="Path to file where model is stored after training or loaded for inference.")
