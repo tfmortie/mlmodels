@@ -187,7 +187,7 @@ def testtransformer(args):
         pred = []
         while t_tensor[0,-1].item() != vocab_t["<eos>"] and len(pred)<=args.ml:
             with torch.no_grad():
-                o = model(s_tensor,t_tensor)
+                o = model(s_tensor,t_tensor,False)
                 # get token
                 pred_token_ind = torch.argmax(nn.functional.softmax(o,dim=-1),dim=-1)[0,-1]
                 t_tensor = torch.cat([t_tensor, torch.tensor([pred_token_ind],dtype=torch.long).view(1,-1).cuda()],dim=1)
@@ -202,7 +202,7 @@ if __name__=="__main__":
     parser.add_argument("-m",dest="m",type=bool,default=True,help="Indicates whether we want training (True) or solely inference (False) mode.")
     parser.add_argument("-e",dest="e",type=int,default=100,help="Number of epochs.")
     parser.add_argument("-i",dest="i",type=int,default=100,help="Number of iterations to print training loss")
-    parser.add_argument("-it",dest="it",type=int,default=100,help="Number of evaluations after which the model should stop training.")
+    parser.add_argument("-it",dest="it",type=int,default=10,help="Number of evaluations after which the model should stop training.")
     parser.add_argument("-b",dest="b",type=int,default=32,help="Batch size.")
     parser.add_argument("-ml",dest="ml",type=int,default=5000,help="Max. length of target and source sequences.")
     parser.add_argument("-dev",dest="dev",type=int,default=-1,help="Device for model training and inference (-2:CPU, -1:default GPU, >=0:GPUx).")

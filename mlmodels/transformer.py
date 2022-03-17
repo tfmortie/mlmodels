@@ -31,7 +31,7 @@ class Transformer(torch.nn.Module):
                 m.bias.data.fill_(0.01)
         self.apply(init_xavier)
 
-    def forward(self, s, t):
+    def forward(self, s, t, mask=True):
         # get embeddings for source and target sequence
         s = self.emb_voc_s(s)
         t = self.emb_voc_t(t)
@@ -43,7 +43,7 @@ class Transformer(torch.nn.Module):
         # and finally pass through decoder
         d_o = t
         for d in self.decoder:
-            d_o = d(d_o, e_o, True)
+            d_o = d(d_o, e_o, mask)
         d_o = self.emb_dm(d_o)
 
         return d_o
