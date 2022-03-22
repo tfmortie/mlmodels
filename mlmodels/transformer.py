@@ -180,11 +180,6 @@ class ScaledLinearDotProductAttention(torch.nn.Module):
         o = o/np.sqrt(self.args.dk)
         if pad_mask is not None:
             o = o.masked_fill(pad_mask.unsqueeze(-2)==1,value=-torch.inf)
-            #m = 1-(pad_mask*1.)
-
-            #m = torch.matmul(m.unsqueeze(2),m.unsqueeze(1))
-            #m = m.log()
-            #o = o + m
         if mask:
             o = o + torch.triu(torch.zeros_like(o)-torch.inf,diagonal=1).to(o.device) # reduces memory usage
         o = torch.nn.functional.softmax(o,dim=-1)
