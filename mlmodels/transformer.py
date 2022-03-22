@@ -13,9 +13,8 @@ class Transformer(torch.nn.Module):
     def __init__(self, voc_s_size, voc_t_size, args):
         super(Transformer, self).__init__()
         self.args = args
-        enc_l = [Encoder(args) for _ in range(args.ns)]
         # register the encoder and decoder
-        self.encoder = torch.nn.Sequential(*enc_l)
+        self.encoder = torch.nn.ModuleList([Encoder(args) for _ in range(args.ns)])
         self.decoder = torch.nn.ModuleList([Decoder(args) for _ in range(args.ns)])
         # register embedding layers for source->embedding and target->embedding
         self.emb_voc_s = torch.nn.Embedding(voc_s_size, args.dm)
@@ -31,7 +30,7 @@ class Transformer(torch.nn.Module):
                 m.bias.data.fill_(0.01)
         self.apply(init_xavier)
 
-    def forward(self, s, t, mask=True):
+    def forward(self, s, t, pad_mask_s=None, pad_mask_t=None, mask=True):
         # get embeddings for source and target sequence
         s = self.emb_voc_s(s)
         t = self.emb_voc_t(t)
@@ -39,11 +38,13 @@ class Transformer(torch.nn.Module):
         s = self.pe(s)
         t = self.pe(t)
         # pass through encoder network
-        e_o = self.encoder(s)
+        e_o = s
+        for e in self.encoder:
+            e_o = e(e_o, pad_mask_s)
         # and finally pass through decoder
         d_o = t
         for d in self.decoder:
-            d_o = d(d_o, e_o, mask)
+            d_o = d(d_o, e_o, pad_mask_t, mask)
         d_o = self.emb_dm(d_o)
 
         return d_o
@@ -84,8 +85,8 @@ class Encoder(torch.nn.Module):
         )
         self.dropout = torch.nn.Dropout(p=args.d)
 
-    def forward(self, x):
-        o1 = self.mha(x)
+    def forward(self, x, pad_mask):
+        o1 = self.mha(x, None, None, pad_mask, False)
         o1 = self.dropout(o1)
         # add skip connection
         o1 = o1 + x
@@ -115,15 +116,15 @@ class Decoder(torch.nn.Module):
         )
         self.dropout = torch.nn.Dropout(p=args.d)
 
-    def forward(self, x, e, mask):
-        o1 = self.mha1(x, None, None, mask)
+    def forward(self, x, e, pad_mask, mask):
+        o1 = self.mha1(x, None, None, pad_mask, mask)
         o1 = self.dropout(o1)
         # add skip connection
         o1 = o1 + x
         # normalize features of each token
         o1 = self.norml(o1)
         # calculate attention with encoded source 
-        o2 = self.mha2(o1,e,e,-1)
+        o2 = self.mha2(o1, e, e, None, None)
         o2 = self.dropout(o2)
         # add second skip connection
         o2 = o2 + o1
@@ -147,7 +148,7 @@ class MultiHeadAttention(torch.nn.Module):
         self.linear = torch.nn.Linear(args.dv*args.nh,args.dm)
         self.sldpa = ScaledLinearDotProductAttention(args)
 
-    def forward(self, q, k=None, v=None, mask=False):
+    def forward(self, q, k=None, v=None, pad_mask=None, mask=False):
         # calculate projections
         if k is None:
             proj_q = self.w_q(q)
@@ -163,7 +164,7 @@ class MultiHeadAttention(torch.nn.Module):
         proj_v_l = torch.chunk(proj_v,self.args.nh,2)
         o_l = []
         for i in range(self.args.nh):
-            o_l.append(self.sldpa(proj_q_l[i], proj_k_l[i], proj_v_l[i], mask))
+            o_l.append(self.sldpa(proj_q_l[i], proj_k_l[i], proj_v_l[i], pad_mask, mask))
         o = torch.cat(o_l,dim=-1)
         o = self.linear(o)
 
@@ -174,9 +175,16 @@ class ScaledLinearDotProductAttention(torch.nn.Module):
         super(ScaledLinearDotProductAttention, self).__init__()
         self.args = args
 
-    def forward(self, ql, kl, vl, mask=False):
+    def forward(self, ql, kl, vl, pad_mask=None, mask=False):
         o = torch.einsum('bij,bjk->bik',ql,torch.einsum('bij->bji',kl))
         o = o/np.sqrt(self.args.dk)
+        if pad_mask is not None:
+            o = o.masked_fill(pad_mask.unsqueeze(-2)==1,value=-torch.inf)
+            #m = 1-(pad_mask*1.)
+
+            #m = torch.matmul(m.unsqueeze(2),m.unsqueeze(1))
+            #m = m.log()
+            #o = o + m
         if mask:
             o = o + torch.triu(torch.zeros_like(o)-torch.inf,diagonal=1).to(o.device) # reduces memory usage
         o = torch.nn.functional.softmax(o,dim=-1)
