@@ -136,3 +136,9 @@ mlmodels/test.py
 
 # Images
 *.png
+
+# Notebooks
+*.ipynb
+
+# Tags
+tags
